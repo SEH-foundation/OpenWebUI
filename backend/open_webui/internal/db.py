@@ -48,9 +48,6 @@ class JSONField(types.TypeDecorator):
 
 
 def prepare_database_url(url: str) -> str:
-    """
-    Prepare DATABASE_URL with SSL requirements if necessary.
-    """
     if "supabase" in url and "sslmode=" not in url:
         if "?" in url:
             url += "&sslmode=require"
@@ -72,7 +69,7 @@ def handle_peewee_migration(database_url: str):
             log.info("✅ Database connected successfully, applying migrations...")
             router.run()
         else:
-            log.warning("⚠️ Database connection closed immediately after opening.")
+            log.warning("⚠️ Database connection was closed immediately after opening.")
     except Exception as e:
         log.error(f"❌ Failed to initialize or migrate database: {e}")
         log.error("🚨 Continuing without database connection. Some features may be unavailable.")
@@ -87,7 +84,6 @@ except Exception as e:
     log.error(f"🔥 Fatal error during database initialization: {e}")
 
 
-# SQLAlchemy setup
 SQLALCHEMY_DATABASE_URL = prepare_database_url(DATABASE_URL)
 
 if "sqlite" in SQLALCHEMY_DATABASE_URL:
