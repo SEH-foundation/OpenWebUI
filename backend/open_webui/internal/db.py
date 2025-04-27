@@ -24,6 +24,8 @@ from typing_extensions import Self
 log = logging.getLogger(__name__)
 log.setLevel(SRC_LOG_LEVELS.get("DB", logging.INFO))
 
+DATABASE_AVAILABLE = False
+
 
 class JSONField(types.TypeDecorator):
     impl = types.Text
@@ -48,15 +50,19 @@ class JSONField(types.TypeDecorator):
 
 
 def prepare_database_url(url: str) -> str:
+    """
+    Prepare DATABASE_URL with SSL requirements if necessary.
+    """
     if "supabase" in url and "sslmode=" not in url:
         if "?" in url:
             url += "&sslmode=require"
         else:
             url += "?sslmode=require"
-    return url.replace("postgresql://", "postgres://")
+    return url
 
 
 def handle_peewee_migration(database_url: str):
+    global DATABASE_AVAILABLE
     db = None
     try:
         fixed_url = prepare_database_url(database_url)
@@ -68,6 +74,7 @@ def handle_peewee_migration(database_url: str):
         if not db.is_closed():
             log.info("✅ Database connected successfully, applying migrations...")
             router.run()
+            DATABASE_AVAILABLE = True
         else:
             log.warning("⚠️ Database connection was closed immediately after opening.")
     except Exception as e:
