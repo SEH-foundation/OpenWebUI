@@ -19,11 +19,10 @@ from sqlalchemy import Dialect, create_engine, MetaData, types
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import scoped_session, sessionmaker
 from sqlalchemy.pool import QueuePool, NullPool
-from sqlalchemy.sql.type_api import _T
 from typing_extensions import Self
 
 log = logging.getLogger(__name__)
-log.setLevel(SRC_LOG_LEVELS["DB"])
+log.setLevel(SRC_LOG_LEVELS.get("DB", logging.INFO))
 
 
 class JSONField(types.TypeDecorator):
@@ -48,34 +47,49 @@ class JSONField(types.TypeDecorator):
             return json.loads(value)
 
 
-# Workaround to handle the peewee migration
-# This is required to ensure the peewee migration is handled before the alembic migration
-def handle_peewee_migration(DATABASE_URL):
-    # db = None
-    try:
-        # Replace the postgresql:// with postgres:// to handle the peewee migration
-        db = register_connection(DATABASE_URL.replace("postgresql://", "postgres://"))
-        migrate_dir = OPEN_WEBUI_DIR / "internal" / "migrations"
-        router = Router(db, logger=log, migrate_dir=migrate_dir)
-        router.run()
-        db.close()
+def prepare_database_url(url: str) -> str:
+    """
+    Prepare DATABASE_URL with SSL requirements if necessary.
+    """
+    if "supabase" in url and "sslmode=" not in url:
+        if "?" in url:
+            url += "&sslmode=require"
+        else:
+            url += "?sslmode=require"
+    return url.replace("postgresql://", "postgres://")
 
+
+def handle_peewee_migration(database_url: str):
+    db = None
+    try:
+        fixed_url = prepare_database_url(database_url)
+        db = register_connection(fixed_url)
+        migrate_dir = OPEN_WEBUI_DIR / "internal" / "migrations"
+        router = Router(db, logger=log)
+
+        db.connect(reuse_if_open=True)
+        if not db.is_closed():
+            log.info("✅ Database connected successfully, applying migrations...")
+            router.run()
+        else:
+            log.warning("⚠️ Database connection closed immediately after opening.")
     except Exception as e:
-        log.error(f"Failed to initialize the database connection: {e}")
-        raise
+        log.error(f"❌ Failed to initialize or migrate database: {e}")
+        log.error("🚨 Continuing without database connection. Some features may be unavailable.")
     finally:
-        # Properly closing the database connection
         if db and not db.is_closed():
             db.close()
 
-        # Assert if db connection has been closed
-        assert db.is_closed(), "Database connection is still open."
+
+try:
+    handle_peewee_migration(DATABASE_URL)
+except Exception as e:
+    log.error(f"🔥 Fatal error during database initialization: {e}")
 
 
-handle_peewee_migration(DATABASE_URL)
+# SQLAlchemy setup
+SQLALCHEMY_DATABASE_URL = prepare_database_url(DATABASE_URL)
 
-
-SQLALCHEMY_DATABASE_URL = DATABASE_URL
 if "sqlite" in SQLALCHEMY_DATABASE_URL:
     engine = create_engine(
         SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False}
@@ -93,9 +107,10 @@ else:
         )
     else:
         engine = create_engine(
-            SQLALCHEMY_DATABASE_URL, pool_pre_ping=True, poolclass=NullPool
+            SQLALCHEMY_DATABASE_URL,
+            pool_pre_ping=True,
+            poolclass=NullPool,
         )
-
 
 SessionLocal = sessionmaker(
     autocommit=False, autoflush=False, bind=engine, expire_on_commit=False
