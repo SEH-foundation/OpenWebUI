@@ -29,10 +29,10 @@ class JSONField(types.TypeDecorator):
     impl = types.Text
     cache_ok = True
 
-    def process_bind_param(self, value: Optional[_T], dialect: Dialect) -> Any:
+    def process_bind_param(self, value: Optional[Any], dialect: Dialect) -> Any:
         return json.dumps(value)
 
-    def process_result_value(self, value: Optional[_T], dialect: Dialect) -> Any:
+    def process_result_value(self, value: Optional[Any], dialect: Dialect) -> Any:
         if value is not None:
             return json.loads(value)
 
