@@ -147,7 +147,7 @@ export const synthesizeOpenAISpeech = async (
 	return res.json();
 };
 
-// 🔧 ВАЖНО: эта функция нужна для корректного импорта в index.ts OpenWebUI
+// ВАЖНО: эта функция нужна для корректного импорта в index.ts OpenWebUI
 export const getOpenAIModelsDirect = async (url: string, key: string) => {
 	const res = await fetch(`${url}/models`, {
 		method: 'GET',
@@ -162,3 +162,16 @@ export const getOpenAIModelsDirect = async (url: string, key: string) => {
 	}
 	return res.json();
 };
+
+export const verifyOpenAIConnection = async (token: string = '') => {
+	const res = await fetch(`${OPENAI_API_BASE_URL}/config`, {
+		method: 'GET',
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			...(token && { Authorization: `Bearer ${token}` })
+		}
+	});
+	return res.ok;
+};
+
