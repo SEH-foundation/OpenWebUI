@@ -1,4 +1,4 @@
-const OPENAI_API_BASE_URL = 'https://synapticabase-production.up.railway.app'; 
+const OPENAI_API_BASE_URL = 'https://synapticabase-production.up.railway.app';
 
 export const getOpenAIConfig = async (token: string = '') => {
 	const res = await fetch(`${OPENAI_API_BASE_URL}/config`, {
@@ -144,5 +144,21 @@ export const synthesizeOpenAISpeech = async (
 			voice: speaker
 		})
 	});
+	return res.json();
+};
+
+// 🔧 ВАЖНО: эта функция нужна для корректного импорта в index.ts OpenWebUI
+export const getOpenAIModelsDirect = async (url: string, key: string) => {
+	const res = await fetch(`${url}/models`, {
+		method: 'GET',
+		headers: {
+			Accept: 'application/json',
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${key}`
+		}
+	});
+	if (!res.ok) {
+		throw new Error('Failed to fetch models');
+	}
 	return res.json();
 };
